@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=40.8.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+requires-python=">=3.7"
+name="XarrayActive"
+version="2024.8.2"
+dynamic = ["dependencies"]
+authors = [{name = "Daniel Westwood", email = "daniel.westwood@stfc.ac.uk"}]
+
+#[tool.setuptools.dynamic]
+#dependencies = {file = ["requirements_dev.txt"]}
+
+[tool.setuptools]
+packages = ["XarrayActive"]
+
+[project.entry-points."xarray.backends"]
+Active = "XarrayActive:ActiveBackendEntrypoint"
