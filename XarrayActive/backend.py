@@ -7,7 +7,7 @@ from xarray.backends import (
     NetCDF4DataStore
 )
 
-from .xarray_active import ActiveDataset
+from .active_xarray import ActiveDataset
 
 def open_active_dataset(
         filename_or_obj,

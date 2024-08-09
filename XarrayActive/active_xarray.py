@@ -7,7 +7,7 @@ import numpy as np
 from xarray.core.dataset import Dataset
 from xarray.core.dataarray import DataArray
 
-from .dask_active import DaskActiveArray
+from .active_dask import DaskActiveArray
 
 class ActiveDataArray(DataArray):
     # No additional properties
