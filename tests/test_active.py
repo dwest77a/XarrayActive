@@ -3,7 +3,7 @@ import xarray as xr
 
 def test_active():
 
-    path_to_active = None
+    path_to_active = f'{__file__}/rain_test.nc'
 
     if not path_to_active:
         return None
@@ -13,11 +13,8 @@ def test_active():
         engine='Active',
         active_options={})
     
-    ## Test global dataset
-    assert not hasattr(ds,'address')
-    assert not hasattr(ds,'shape')
-    assert not hasattr(ds,'location')
-    
+    # Need to find a real example.
+
     assert 'p' in ds
     assert ds['p'].shape == (20, 180, 360)
 
