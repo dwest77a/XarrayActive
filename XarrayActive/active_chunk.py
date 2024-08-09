@@ -1,4 +1,29 @@
 import numpy as np
+from itertools import product
+
+
+class ActiveOptionsContainer:
+    """
+    Container for ActiveOptions properties.
+    """
+    @property
+    def active_options(self):
+        """
+        Property of the datastore that relates private option variables to the standard 
+        ``active_options`` parameter.
+        """
+        return {
+            'chunks': self._active_chunks,
+            'chunk_limits': self._chunk_limits,
+        }
+    
+    @active_options.setter
+    def active_options(self, value):
+        self._set_active_options(**value)
+
+    def _set_active_options(self, chunks=None, chunk_limits=True):
+        self._active_chunks = chunks
+        self._chunk_limits = chunk_limits
 
 
 # Holds all CFA-specific Active routines.
@@ -101,3 +126,24 @@ class ActiveChunk:
                 dimarray.append(self._get_elements(active, recursives[1:], hyperslab=newslab))
 
         return dimarray
+
+def _determine_chunk_space(chunks, shape, dims, chunk_limits=True):
+    
+    chunk_space = [1 for i in range(len(shape))]
+    dim_shapes = {d: s for d,s in zip(dims, shape)}
+
+    max_chunks = product(shape)
+    if chunk_limits:
+        max_chunks = int(max_chunks/ 2e6)
+
+    for x, d in enumerate(dims):
+        if d not in chunks:
+            continue
+
+        chunks_in_dim = chunks[d]
+        if chunks_in_dim > max_chunks:
+            chunks_in_dim = max_chunks
+
+        chunk_space[x] = shape[x]/chunks[d]
+
+    return tuple(chunk_space)
