@@ -8,6 +8,7 @@ from xarray.backends import (
 )
 
 from .active_xarray import ActiveDataset
+from .datastore import ActiveDataStore
 
 def open_active_dataset(
         filename_or_obj,
@@ -18,7 +19,7 @@ def open_active_dataset(
         decode_coords=None,
         use_cftime=None,
         decode_timedelta=None,
-        active_options=None,
+        active_options={},
         group=None,
         ):
     """
@@ -32,7 +33,7 @@ def open_active_dataset(
     """
 
     # Load the normal datastore from the provided file (object not supported).
-    store = NetCDF4DataStore.open(filename_or_obj, group=group)
+    store = ActiveDataStore.open(filename_or_obj, group=group)
 
     store.active_options = active_options
 
@@ -67,7 +68,7 @@ class ActiveBackendEntrypoint(BackendEntrypoint):
             decode_coords=None,
             use_cftime=None,
             decode_timedelta=None,
-            active_options=None,
+            active_options={},
             group=None,
             # backend specific keyword arguments
             # do not use 'chunks' or 'cache' here
