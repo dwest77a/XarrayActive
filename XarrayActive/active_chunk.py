@@ -30,9 +30,6 @@ class ActiveOptionsContainer:
 class ActiveChunk:
 
     description = "Container class for Active routines performed on each chunk. All active-per-chunk content can be found here."
-
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError
     
     def _post_process_data(self, data):
         # Perform any post-processing steps on the data here

@@ -54,6 +54,8 @@ class ActiveArrayWrapper(ArrayLike, ActiveOptionsContainer):
             chunk_limits=self._chunk_limits)
 
         super().__init__(shape, units=units, dtype=dtype)
+
+        self.__array_function__ = self.__array__
                 
     def __getitem__(self, selection):
         """
@@ -107,7 +109,7 @@ class ActiveArrayWrapper(ArrayLike, ActiveOptionsContainer):
             return DaskActiveArray(dsk, array_name[0], chunks=self.get_dask_chunks(), dtype=self.dtype)
 
     def get_chunk_positions(self):
-        origin = [0 for i  in range(self.ndim)]
+        origin = [0 for i in range(self.ndim)]
 
         positions = [
             coord for coord in product(
