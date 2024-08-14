@@ -25,7 +25,7 @@ class ActiveDataStore(NetCDF4DataStore, ActiveOptionsContainer):
         )
     
     def open_variable(self, name: str, var):
-        if var in self.ds.dimensions:
+        if name in self.ds.dimensions:
             return self.open_store_variable(name, var)
         else:
             return self.open_active_variable(name, var)
@@ -47,7 +47,7 @@ class ActiveDataStore(NetCDF4DataStore, ActiveOptionsContainer):
                 var.shape,
                 units,
                 var.dtype,
-                named_dims=tuple(dimensions.keys()),
+                named_dims=dimensions,
                 active_options=self.active_options
             )
         )
