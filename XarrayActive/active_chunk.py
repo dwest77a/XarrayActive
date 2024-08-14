@@ -130,9 +130,8 @@ class ActiveChunk:
 def _determine_chunk_space(chunks, shape, dims, chunk_limits=True):
     
     chunk_space = [1 for i in range(len(shape))]
-    dim_shapes = {d: s for d,s in zip(dims, shape)}
 
-    max_chunks = product(shape)
+    max_chunks = np.prod(shape)
     if chunk_limits:
         max_chunks = int(max_chunks/ 2e6)
 
@@ -144,6 +143,6 @@ def _determine_chunk_space(chunks, shape, dims, chunk_limits=True):
         if chunks_in_dim > max_chunks:
             chunks_in_dim = max_chunks
 
-        chunk_space[x] = shape[x]/chunks[d]
+        chunk_space[x] = int(shape[x]/chunks[d])
 
     return tuple(chunk_space)
