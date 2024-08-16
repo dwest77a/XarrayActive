@@ -21,9 +21,10 @@ class ActiveOptionsContainer:
     def active_options(self, value):
         self._set_active_options(**value)
 
-    def _set_active_options(self, chunks=None, chunk_limits=True):
+    def _set_active_options(self, chunks={}, chunk_limits=True):
         self._active_chunks = chunks
         self._chunk_limits = chunk_limits
+
 
 
 # Holds all CFA-specific Active routines.
@@ -35,31 +36,32 @@ class ActiveChunk:
         # Perform any post-processing steps on the data here
         return data
 
-    def _standard_mean(self, axis=None, skipna=None, **kwargs):
+    def _standard_mean(self, axes=None, skipna=None, **kwargs):
         """
         Standard Mean routine matches the normal routine for dask, required at this
         stage if Active mean not available.
         """
         size = 1
-        for i in axis:
+        for i in axes:
             size *= self.shape[i]
 
         arr = np.array(self)
         if skipna:
-            total = np.nanmean(arr, axis=axis, **kwargs) *size
+            total = np.nanmean(arr, axis=axes, **kwargs) *size
         else:
-            total = np.mean(arr, axis=axis, **kwargs) *size
-        return {'n': self._numel(arr, axis=axis), 'total': total}
-
-    def _numel(self, axis=None):
-        if not axis:
+            total = np.mean(arr, axis=axes, **kwargs) *size
+        return {'n': self._numel(axes=axes), 'total': total}
+    
+    def _numel(self, axes=None):
+        if not axes:
             return self.size
         
         size = 1
-        for i in axis:
+        for i in axes:
             size *= self.shape[i]
         newshape = list(self.shape)
-        newshape[axis] = 1
+        for ax in axes:
+            newshape[ax] = 1
 
         return np.full(newshape, size)
 
@@ -67,31 +69,40 @@ class ActiveChunk:
         """
         Use PyActiveStorage package functionality to perform mean of this Fragment.
 
-        :param axis:        (int) The axis over which to perform the active_mean operation.
+        :param axis:        (int) The axes over which to perform the active_mean operation.
 
         :param skipna:      (bool) Skip NaN values when calculating the mean.
 
         :returns:       A ``duck array`` (numpy-like) with the reduced array or scalar value, 
-                        as specified by the axis parameter.
+                        as specified by the axes parameter.
         """
         try:
             from activestorage.active import Active
         except ImportError:
             # Unable to import Active package. Default to using normal mean.
             print("ActiveWarning: Unable to import active module - defaulting to standard method.")
-            return self._standard_mean(axis=axis, skipna=skipna, **kwargs)
+            return self._standard_mean(axes=axis, skipna=skipna, **kwargs)
             
         active = Active(self.filename, self.address)
         active.method = "mean"
-        extent = self.get_extent()
+        extent = tuple(self.get_extent())
+        data   = active[extent]
 
-        if not axis is None:
-            return {
-                'n': self._numel(axis=axis),
-                'total': self._post_process_data(active[extent])
+        if axis == None:
+            axis = tuple([i for i in range(self.ndim)])
+
+        if len(axis) == self.ndim:
+
+            n = self._numel(axes=axis)
+            t = self._post_process_data(data) * n
+
+            r = {
+                'n': n,
+                'total': t
             }
+            return r
 
-        # Experimental Recursive requesting to get each 1D column along the axis being requested.
+        # Experimental Recursive requesting to get each 1D column along the axes being requested.
         range_recursives = []
         for dim in range(self.ndim):
             if dim != axis:
@@ -101,7 +112,7 @@ class ActiveChunk:
         results = np.array(self._get_elements(active, range_recursives, hyperslab=[]))
 
         return {
-            'n': self._numel(axis=axis),
+            'n': self._numel(axes=axis),
             'total': self._post_process_data(results)
         }
 
@@ -126,6 +137,9 @@ class ActiveChunk:
 
 def _determine_chunk_space(chunks, shape, dims, chunk_limits=True):
     
+    if not chunks:
+        return None
+
     chunk_space = [1 for i in range(len(shape))]
 
     max_chunks = np.prod(shape)
