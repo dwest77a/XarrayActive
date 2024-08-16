@@ -25,7 +25,7 @@ class ActiveDataStore(NetCDF4DataStore, ActiveOptionsContainer):
         )
     
     def open_variable(self, name: str, var):
-        if name in self.ds.dimensions:
+        if name in self.ds.dimensions or not self._active_chunks:
             return self.open_store_variable(name, var)
         else:
             return self.open_active_variable(name, var)
