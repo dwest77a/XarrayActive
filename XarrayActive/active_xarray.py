@@ -15,8 +15,8 @@ class ActiveDataArray(DataArray):
 
     def mean(
         self,
-        dim,
         *,
+        dim = None,
         skipna = None,
         keep_attrs = None,
         **kwargs,
