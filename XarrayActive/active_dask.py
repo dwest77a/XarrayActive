@@ -1,5 +1,5 @@
 import dask.array as da
-from dask.array.reductions import mean_agg
+from dask.array.reductions import mean_agg, mean_combine
 
 
 def block_active_mean(arr, *args, **kwargs):
@@ -51,8 +51,9 @@ class DaskActiveArray(da.Array):
             self,
             block_active_mean,
             mean_agg,
+            combine=mean_combine,
             axis=axis,
-            dtype=self.dtype
+            dtype=self.dtype,
         )
 
-        return DaskActiveArray(newarr.dask, newarr.name, newarr.chunks, meta=newarr)
+        return newarr
