@@ -22,6 +22,13 @@ class ActiveOptionsContainer:
         self._set_active_options(**value)
 
     def _set_active_options(self, chunks={}, chunk_limits=True):
+
+        if chunks == {}:
+            raise NotImplementedError(
+                'Default chunking is not implemented, please provide a chunk scheme '
+                ' - active_options = {"chunks": {}}'
+            )
+
         self._active_chunks = chunks
         self._chunk_limits = chunk_limits
 
@@ -91,9 +98,10 @@ class ActiveChunk:
         if axis == None:
             axis = tuple([i for i in range(self.ndim)])
 
+        n = self._numel(axes=axis)
+
         if len(axis) == self.ndim:
 
-            n = self._numel(axes=axis)
             t = self._post_process_data(data) * n
 
             r = {
@@ -105,24 +113,26 @@ class ActiveChunk:
         # Experimental Recursive requesting to get each 1D column along the axes being requested.
         range_recursives = []
         for dim in range(self.ndim):
-            if dim != axis:
-                range_recursives.append(range(extent[dim].start, extent[dim].stop+1))
+            if dim not in axis:
+                range_recursives.append(range(extent[dim].start, extent[dim].stop))
             else:
                 range_recursives.append(extent[dim])
         results = np.array(self._get_elements(active, range_recursives, hyperslab=[]))
 
+        t = self._post_process_data(results) * n
         return {
-            'n': self._numel(axes=axis),
-            'total': self._post_process_data(results)
+            'n': n,
+            'total': t
         }
 
     def _get_elements(self, active, recursives, hyperslab=[]):
         dimarray = []
-        current = recursives[0]
-        if not len(recursives) > 1:
+        if not len(recursives) > 0:
 
             # Perform active slicing and meaning here.
-            return active[hyperslab]
+            return active[tuple(hyperslab)].flatten()[0]
+        
+        current = recursives[0]
 
         if type(current) == slice:
             newslab = hyperslab + [current]
