@@ -3,12 +3,13 @@ __contact__   = "daniel.westwood@stfc.ac.uk"
 __copyright__ = "Copyright 2023 United Kingdom Research and Innovation"
 
 # Chunk wrapper is common to both CFAPyX and XarrayActive
-VERSION = 1.0
+VERSION = '1.2.1'
 
 import numpy as np
 import netCDF4
 
 from itertools import product
+from copy import deepcopy
 from dask.utils import SerializableLock
 
 try:
@@ -23,12 +24,16 @@ class ArrayLike:
     """
     description = 'Container class for Array-Like behaviour'
 
-    def __init__(self, shape, units=None, dtype=None):
+    def __init__(self, shape, units=None, dtype=None, source_shape=None):
 
         # Standard parameters to store for array-like behaviour
         self.shape = shape
         self.units = units
         self.dtype = dtype
+
+        if not source_shape: # First time instantiation - all other copies will not use this.
+            source_shape = shape
+        self._source_shape = source_shape
 
     # Shape-based properties (Lazy loading means this may change in some cases)
     @property
@@ -63,7 +68,8 @@ class ArrayLike:
         Get the kwargs provided to this class initially - for creating a copy."""
         return {
             'units':self.units,
-            'dtype':self.dtype
+            'dtype':self.dtype,
+            'source_shape': self._source_shape
         }
 
 class SuperLazyArrayLike(ArrayLike):
@@ -74,7 +80,7 @@ class SuperLazyArrayLike(ArrayLike):
 
     description = "Container class for SuperLazy Array-Like behaviour"
 
-    def __init__(self, shape, **kwargs):
+    def __init__(self, shape, named_dims=None, **kwargs):
         """
         Adds an ``extent`` variable derived from the initial shape,
         this can be altered by performing slices, which are not applied 
@@ -85,6 +91,8 @@ class SuperLazyArrayLike(ArrayLike):
             slice(0, i) for i in shape
         ]
 
+        self.named_dims = named_dims
+
         super().__init__(shape, **kwargs)
  
     def __getitem__(self, selection):
@@ -93,8 +101,7 @@ class SuperLazyArrayLike(ArrayLike):
         This is considered ``SuperLazy`` because Dask already loads dask chunks lazily, but a further lazy
         approach is required when applying Active methods.
         """
-        newextent = self._combine_slices(selection)
-        return self.copy(newextent)
+        return self.copy(extent=selection)
     
     @property
     def shape(self):
@@ -110,7 +117,7 @@ class SuperLazyArrayLike(ArrayLike):
             return self._shape
         for d, e in enumerate(self._extent):
             start = e.start or 0
-            stop  = e.stop or self.shape[d]
+            stop  = e.stop or self._shape[d]
             step  = e.step or 1
             current_shape.append(int((stop - start)/step))
         return tuple(current_shape)
@@ -137,23 +144,36 @@ class SuperLazyArrayLike(ArrayLike):
                 raise ValueError(
                     "Active chain broken - mean has already been accomplished."
                 )
+            
             else:
-                self._array = np.array(self)[newslice]
-                return None
+                raise ValueError(
+                    "Compute chain broken - dimensions have been reduced already."
+                )
         
         def combine_sliced_dim(old, new, dim):
 
             ostart = old.start or 0
-            ostop  = old.stop or self._shape[dim]
+            ostop  = old.stop or self.shape[dim]
             ostep  = old.step or 1
 
+            osize = (ostop - ostart)/ostep
+
             nstart = new.start or 0
-            nstop  = new.stop or self._shape[dim]
+            nstop  = new.stop or self.shape[dim]
             nstep  = new.step or 1
+
+            nsize = (nstop - nstart)/nstep
+
+            if nsize > osize:
+                raise IndexError(
+                    f'Attempted to slice dimension "{dim}" with new slice "({nstart},{nstop},{nstep})'
+                    f'but the dimension size is limited to {osize}.'
+                )
 
             start = ostart + ostep*nstart
             step  = ostep * nstep
             stop  = start + step * (nstop - nstart)
+            
             return slice(start, stop, step)
 
 
@@ -162,13 +182,14 @@ class SuperLazyArrayLike(ArrayLike):
         else:
             extent = self._extent
             for dim in range(len(newslice)):
-                extent[dim] = combine_sliced_dim(extent[dim], newslice[dim], dim)
+                if not _identical_extents(extent[dim], newslice[dim], self.shape[dim]):
+                    extent[dim] = combine_sliced_dim(extent[dim], newslice[dim], dim)
             return extent
    
     def get_extent(self):
         return self._extent
 
-    def copy(self, newextent=None):
+    def copy(self, extent=None):
         """
         Create a new instance of this class with all attributes of the current instance, but
         with a new initial extent made by combining the current instance extent with the ``newextent``.
@@ -176,13 +197,19 @@ class SuperLazyArrayLike(ArrayLike):
         slicing operations.
         """
         kwargs = self.get_kwargs()
-        if newextent:
-            kwargs['extent'] = self._combine_slices(newextent)
+        if extent:
+            kwargs['extent'] = self._combine_slices(extent)
 
         new_instance = SuperLazyArrayLike(
+            self.shape,
             **kwargs
             )
         return new_instance
+    
+    def get_kwargs(self):
+        return {
+            'named_dims': self.named_dims
+        } | super().get_kwargs()
 
 class ArrayPartition(ActiveChunk, SuperLazyArrayLike):
     """
@@ -194,12 +221,11 @@ class ArrayPartition(ActiveChunk, SuperLazyArrayLike):
     def __init__(self,
                  filename,
                  address,
-                 dtype=None,
-                 units=None,
                  shape=None,
                  position=None,
                  extent=None,
                  format=None,
+                 **kwargs
             ):
         
         """
@@ -243,10 +269,13 @@ class ArrayPartition(ActiveChunk, SuperLazyArrayLike):
         self.format   = format
         self.position = position
 
-        self._extent  = extent
         self._lock    = SerializableLock()
 
-        super().__init__(shape, dtype=dtype, units=units)
+        super().__init__(shape, **kwargs)
+
+        if extent:
+            # Apply a specific extent if given by the initiator
+            self._extent  = extent
     
     def __array__(self, *args, **kwargs):
         """
@@ -291,6 +320,12 @@ class ArrayPartition(ActiveChunk, SuperLazyArrayLike):
                 f"the variable '{varname}'."
             )
         
+        if hasattr(array, 'units'):
+            self.units = array.units
+        
+        if len(array.shape) != len(self._extent):
+            self._correct_slice(array.dimensions)
+
         try:
             var = np.array(array[tuple(self._extent)])
         except IndexError:
@@ -301,6 +336,35 @@ class ArrayPartition(ActiveChunk, SuperLazyArrayLike):
 
         return self._post_process_data(var)
     
+    def _correct_slice(self, array_dims):
+        """
+        Drop size-1 dimensions from the set of slices if there is an issue.
+
+        :param array_dims:      (tuple) The set of named dimensions present in
+            the source file. If there are fewer array_dims than the expected
+            set in ``named_dims`` then this function is used to remove extra
+            dimensions from the ``extent`` if possible.
+        """
+        extent = []
+        for dim in range(len(self.named_dims)):
+            named_dim = self.named_dims[dim]
+            if named_dim in array_dims:
+                extent.append(self._extent[dim])
+
+            # named dim not present
+            ext = self._extent[dim]
+            
+            start = ext.start or 0 
+            stop  = ext.stop or self.shape[dim]
+            step  = ext.step or 1
+
+            if int(stop - start)/step > 1:
+                raise ValueError(
+                    f'Attempted to slice dimension "{named_dim}" using slice "{ext}" '
+                    'but the requested dimension is not present'
+                )
+        self._extent = extent
+            
     def _post_process_data(self, data):
         """
         Perform any post-processing steps on the data here.
@@ -344,15 +408,13 @@ class ArrayPartition(ActiveChunk, SuperLazyArrayLike):
         Return all the initial kwargs from instantiation, to support ``.copy()`` mechanisms by higher classes.
         """
         return {
-            'dtype': self.dtype,
-            'units': self.units,
             'shape': self.shape,
             'position': self.position,
             'extent': self._extent,
             'format': self.format
-        }
+        } | super().get_kwargs()
     
-    def copy(self, newextent=None):
+    def copy(self, extent=None):
         """
         Create a new instance of this class with all attributes of the current instance, but
         with a new initial extent made by combining the current instance extent with the ``newextent``.
@@ -360,10 +422,10 @@ class ArrayPartition(ActiveChunk, SuperLazyArrayLike):
         slicing operations.
         """
         kwargs = self.get_kwargs()
-        if newextent:
-            kwargs['extent'] = self._combine_slices(newextent)
+        if extent:
+            kwargs['extent'] = self._combine_slices(extent)
 
-        new_instance = SuperLazyArrayLike(
+        new_instance = ArrayPartition(
             self.filename,
             self.address,
             **kwargs,
@@ -408,7 +470,19 @@ class ArrayPartition(ActiveChunk, SuperLazyArrayLike):
                 pass
 
         raise FileNotFoundError(
-            f'None of the location options for chunk "{self.position}" could be accessed.'
+            f'None of the location options for chunk "{self.position}" could be accessed. '
             f'Locations tried: {filenames}.'
         )
     
+def _identical_extents(old, new, dshape):
+    ostart = old.start or 0
+    ostop  = old.stop or dshape
+    ostep  = old.step or 1
+
+    nstart = new.start or 0
+    nstop  = new.stop or dshape
+    nstep  = new.step or 1
+
+    return (ostart == nstart) and \
+           (ostop == nstop) and \
+           (ostep == nstep)
