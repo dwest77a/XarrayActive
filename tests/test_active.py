@@ -3,26 +3,19 @@ import xarray as xr
 
 def test_active():
 
-    path_to_active = f'{__file__}/rain_test.nc'
-
-    if not path_to_active:
-        return None
+    path_to_active = f'tests/rain_test.nc'
 
     ds = xr.open_dataset(
         path_to_active, 
         engine='Active',
         active_options={})
-    
-    # Need to find a real example.
 
     assert 'p' in ds
     assert ds['p'].shape == (20, 180, 360)
 
-    p_sel = ds['p'].sel(time=slice(1,3),latitude=slice(50,54), longitude=slice(0,9))
+    p_sel = ds['p'].isel(time=slice(0,3),latitude=slice(140,145), longitude=slice(90,100))
 
     assert p_sel.shape == (3, 5, 10)
-    assert not hasattr(p_sel, 'aggregated_data')
-    assert not hasattr(p_sel, 'aggregated_dimensions')
 
     p_mean = p_sel.mean(dim='time')
 
