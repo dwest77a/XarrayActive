@@ -61,5 +61,4 @@ def test_active_recursive():
 
 if __name__ == '__main__':
     test_active()
-
     test_active_recursive()

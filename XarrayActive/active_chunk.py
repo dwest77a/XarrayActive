@@ -34,7 +34,7 @@ class ActiveOptionsContainer:
 
 
 
-# Holds all CFA-specific Active routines.
+# Holds all Active routines.
 class ActiveChunk:
 
     description = "Container class for Active routines performed on each chunk. All active-per-chunk content can be found here."
