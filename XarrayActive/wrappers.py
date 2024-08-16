@@ -12,17 +12,22 @@ from dask.base import tokenize
 
 from itertools import product
 
-class ActiveChunkWrapper(ArrayPartition):
+class ActivePartition(ArrayPartition):
     """
     Combines ActiveChunk - active methods, and ArrayPartition - array methods
     into a single ChunkWrapper class. 
     """
-    def copy(self):
-        return ActiveChunkWrapper(
+    def copy(self, extent=None):
+
+        kwargs = self.get_kwargs()
+        if extent:
+            kwargs['extent'] = self._combine_slices(extent)
+        ap = ActivePartition(
             self.filename,
             self.address,
-            **self.get_kwargs()
+            **kwargs
         )
+        return ap
 
 class ActiveArrayWrapper(ArrayLike, ActiveOptionsContainer):
     """
@@ -55,6 +60,10 @@ class ActiveArrayWrapper(ArrayLike, ActiveOptionsContainer):
 
         super().__init__(shape, units=units, dtype=dtype)
 
+        self.chunk_shape = tuple([
+            int(self.shape[i]/self.chunk_space[i]) for i in range(self.ndim)
+        ])
+
         self.__array_function__ = self.__array__
                 
     def __getitem__(self, selection):
@@ -79,18 +88,21 @@ class ActiveArrayWrapper(ArrayLike, ActiveOptionsContainer):
 
             array_name = (f"{self.__class__.__name__}-{tokenize(self)}",)
             dsk = {}
-            for position in self.get_chunk_positions():
+            positions = self.get_chunk_positions()
+            request   = self.get_chunk_extent(positions[0])
+
+            for position in positions:
                 position = tuple(position)
             
                 extent   = self.get_chunk_extent(position)
                 cformat  = None
                 
-                chunk = ActiveChunkWrapper(
+                chunk = ActivePartition(
                     self.filename,
                     self.name,
                     dtype=self.dtype,
                     units=self.units,
-                    shape=self.shape,
+                    shape=self.chunk_shape,
                     position=position,
                     extent=extent,
                     format=cformat
@@ -101,7 +113,7 @@ class ActiveArrayWrapper(ArrayLike, ActiveOptionsContainer):
                 dsk[array_name + position] = (
                     getter, # Dask default should be enough with the new indexing routine.
                     c_identifier,
-                    chunk.get_extent(),
+                    request,
                     False,
                     getattr(chunk,"_lock",False)
                 )
@@ -121,7 +133,7 @@ class ActiveArrayWrapper(ArrayLike, ActiveOptionsContainer):
     
     def get_chunk_extent(self, position):
         extent = []
-        for dim in self.ndim:
+        for dim in range(self.ndim):
             pos_index   = position[dim]
             shape_size = self.shape[dim]
             space_size = self.chunk_space[dim]
@@ -129,7 +141,7 @@ class ActiveArrayWrapper(ArrayLike, ActiveOptionsContainer):
             conversion = shape_size/space_size
 
             ext = slice(
-                pos_index*conversion, (pos_index+1)*conversion
+                int(pos_index*conversion), int((pos_index+1)*conversion)
             )
             extent.append(ext)
         return extent
@@ -147,7 +159,6 @@ class ActiveArrayWrapper(ArrayLike, ActiveOptionsContainer):
         from numbers import Number
         from dask.array.core import normalize_chunks
 
-        extent = self.get_chunk_extent([0 for dim in self.ndim])
         ndim   = len(self.shape)
         csizes_per_dim, chunked_dim_indices = [],[]
 
@@ -158,7 +169,7 @@ class ActiveArrayWrapper(ArrayLike, ActiveOptionsContainer):
                 index = [0] * ndim
                 for n in range(n_chunks):
                     index[dim] = n
-                    ext = extent[tuple(index)][dim]
+                    ext = self.get_chunk_extent(index)[dim]
                     chunk_size = ext.stop - ext.start
                     csizes.append(chunk_size)
 
@@ -193,5 +204,6 @@ class ActiveArrayWrapper(ArrayLike, ActiveOptionsContainer):
                 cs if i in chunked_dim_indices else explicit_shapes[i] for i, cs in enumerate(csizes_per_dim)
             ]
 
-        return normalize_chunks(csizes_per_dim, shape=self.shape, dtype=self.dtype)
+        c = normalize_chunks(csizes_per_dim, shape=self.shape, dtype=self.dtype)
+        return c
 
