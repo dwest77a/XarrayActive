@@ -1,8 +1,12 @@
-from .partition import ArrayPartition, ArrayLike
+from .partition import (
+    ArrayPartition, 
+    ArrayLike,
+    _get_chunk_space,
+    _get_chunk_shape,
+)
 from .active_chunk import (
     ActiveChunk, 
-    ActiveOptionsContainer, 
-    _determine_chunk_space
+    ActiveOptionsContainer
 )
 
 from .active_dask import DaskActiveArray
@@ -40,9 +44,9 @@ class ActiveArrayWrapper(ArrayLike, ActiveOptionsContainer):
             filename,
             var, 
             shape,
-            units,
-            dtype,
-            named_dims,
+            units=None,
+            dtype=None,
+            named_dims=None,
             active_options={},
         ):
 
@@ -52,17 +56,21 @@ class ActiveArrayWrapper(ArrayLike, ActiveOptionsContainer):
         self.name        = var.name
         self.active_options = active_options
 
-        self.chunk_space = _determine_chunk_space(
-            self._active_chunks, 
-            shape, 
-            named_dims,
-            chunk_limits=self._chunk_limits)
+        self.named_dims = named_dims
 
         super().__init__(shape, units=units, dtype=dtype)
 
-        self.chunk_shape = tuple([
-            int(self.shape[i]/self.chunk_space[i]) for i in range(self.ndim)
-        ])
+        self.chunk_shape = _get_chunk_shape(
+            self._active_chunks,
+            self.shape,
+            self.named_dims,
+            chunk_limits=self._chunk_limits
+        )
+
+        self.chunk_space = _get_chunk_space(
+            self.chunk_shape,
+            self.shape
+        )
 
         self.__array_function__ = self.__array__
                 
