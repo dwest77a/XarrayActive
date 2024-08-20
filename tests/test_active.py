@@ -22,9 +22,9 @@ def test_active():
     assert 'p' in ds
     assert ds['p'].shape == (20, 180, 360)
 
-    p_sel = ds['p']#.isel(time=slice(0,3),latitude=slice(140,145), longitude=slice(90,100))
+    p_sel = ds['p'].isel(time=slice(0,3),latitude=slice(140,145), longitude=slice(90,100))
 
-    #assert p_sel.shape == (3, 5, 10)
+    assert p_sel.shape == (3, 5, 10)
 
     p_value = p_sel.mean()
 
@@ -80,19 +80,19 @@ def test_active_methods():
     assert 'p' in ds
     assert ds['p'].shape == (20, 180, 360)
 
-    p_sel = ds['p'].isel(time=slice(0,3),latitude=slice(140,145), longitude=slice(90,100))
+    p_sel = ds['p'].isel(latitude=slice(140,145), longitude=slice(90,100))
 
-    assert p_sel.shape == (3, 5, 10)
+    assert p_sel.shape == (20, 5, 10)
 
-    p_value = p_sel.isel().max()
+    p_value = p_sel.isel(time=slice(0,3)).max()
     assert p_value.shape == ()
     assert (p_value.to_numpy() - 0.9978273) < 0.01
 
-    p_value = p_sel.isel().min()
+    p_value = p_sel.isel(time=slice(0,3)).min()
     assert p_value.shape == ()
     assert (p_value.to_numpy() - 0.0014456) < 0.01
 
-    p_value = p_sel.isel().sum()
+    p_value = p_sel.isel(time=slice(0,3)).sum()
     assert p_value.shape == ()
     assert (p_value.to_numpy() - 76.7931739) < 0.01
 

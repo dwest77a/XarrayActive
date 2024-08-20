@@ -21,13 +21,8 @@ class ActivePartition(ArrayPartition):
     Combines ActiveChunk - active methods, and ArrayPartition - array methods
     into a single ChunkWrapper class. 
     """
-    def copy_id(self):
-        if not hasattr(self, '_copy_id'):
-            self._copy_id = 1
-
     def copy(self, extent=None):
 
-        self.copy_id()
         kwargs = self.get_kwargs()
         if extent:
             kwargs['extent'] = self._combine_slices(extent)
@@ -36,7 +31,6 @@ class ActivePartition(ArrayPartition):
             self.address,
             **kwargs
         )
-        ap._copy_id = self._copy_id + 1
         return ap
 
 class ActiveArrayWrapper(ArrayLike, ActiveOptionsContainer):

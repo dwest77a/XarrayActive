@@ -180,14 +180,14 @@ class SuperLazyArrayLike(ArrayLike):
         if not self._extent:
             return newslice
         else:
-            extent = self._extent
+            extent = list(self.get_extent())
             for dim in range(len(newslice)):
                 if not _identical_extents(extent[dim], newslice[dim], self.shape[dim]):
                     extent[dim] = combine_sliced_dim(extent[dim], newslice[dim], dim)
             return extent
    
     def get_extent(self):
-        return self._extent
+        return tuple(self._extent)
 
     def copy(self, extent=None):
         """

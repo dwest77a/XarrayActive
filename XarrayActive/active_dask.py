@@ -1,5 +1,5 @@
 import dask.array as da
-from dask.array.reductions import mean_agg, mean_combine
+from dask.array.reductions import mean_agg, mean_combine, nanmax, nanmin
 from dask.utils import deepmap
 from dask.array.core import _concatenate2
 import numpy as np
@@ -20,9 +20,11 @@ def partition_method(arr, method, *args, **kwargs):
     if hasattr(arr,'active_method'):
         return arr.active_method(method,*args, **kwargs)
     else:
-        # Here's where barebones Xarray might fall over - may need a non-CFA custom class.
-        x=input('stopped')
-        raise NotImplementedError
+        # Additional handling for 'meta' calculations in dask.
+        # Not currently implemented, bypassed using None
+        if arr.size == 0:
+            return None
+        return None
 
 def general_combine(pairs, axis=None):
     if not isinstance(pairs, list):
@@ -46,26 +48,22 @@ class DaskActiveArray(da.Array):
     def is_active(self):
         return True
 
-    def copy(self):
-        """
-        Create a new DaskActiveArray instance with all the same parameters as the current instance.
-        """
-        copy_arr = DaskActiveArray(self.dask, self.name, self.chunks, meta=self)
-        return copy_arr
+    #def copy(self):
+    #    """
+    #    Create a new DaskActiveArray instance with all the same parameters as the current instance.
+    #    """
+     #   copy_arr = DaskActiveArray(self.dask, self.name, self.chunks, meta=self)
+    #    return copy_arr
     
-    #def __getitem__(self, index):
-    #    """
-    #    Perform indexing for this ActiveArray. May need to overwrite further if it turns out
-    #    the indexing is performed **after** the dask `getter` method (i.e if retrieval and indexing
-    #    are separate items on the dask graph). If this is the case, will need another `from_delayed`
-    #    and `concatenation` method as used in ``active_mean``.
-    #    """
-    #    copy = self.copy()
-
-    #    return copy._getitem(index)
-
-    #def _getitem(self, index):
-    #    return super().__getitem__(index)
+    def __getitem__(self, index):
+        """
+        Perform indexing for this ActiveArray. May need to overwrite further if it turns out
+        the indexing is performed **after** the dask `getter` method (i.e if retrieval and indexing
+        are separate items on the dask graph). If this is the case, will need another `from_delayed`
+        and `concatenation` method as used in ``active_mean``.
+        """
+        arr = super().__getitem__(index)
+        return DaskActiveArray(arr.dask, arr.name, arr.chunks, meta=arr)
 
     def active_mean(self, axis=None, skipna=None):
         """
@@ -82,7 +80,7 @@ class DaskActiveArray(da.Array):
         """
 
         newarr = da.reduction(
-            self.copy(),
+            self,
             partition_mean,
             mean_agg,
             combine=mean_combine,
@@ -107,7 +105,7 @@ class DaskActiveArray(da.Array):
         """
 
         newarr = da.reduction(
-            self.copy(),
+            self,
             partition_max,
             max_agg,
             combine=max_agg,
@@ -132,7 +130,7 @@ class DaskActiveArray(da.Array):
         """
 
         newarr = da.reduction(
-            self.copy(),
+            self,
             partition_min,
             min_agg,
             combine=min_agg,
@@ -157,7 +155,7 @@ class DaskActiveArray(da.Array):
         """
 
         newarr = da.reduction(
-            self.copy(),
+            self,
             partition_sum,
             sum_agg,
             combine=sum_agg,

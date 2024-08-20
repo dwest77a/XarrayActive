@@ -8,6 +8,7 @@ from xarray.core.dataset import Dataset
 from xarray.core.dataarray import DataArray
 
 from .active_dask import DaskActiveArray
+from xarray.core import duck_array_ops
 
 class ActiveDataArray(DataArray):
     # No additional properties
@@ -32,7 +33,7 @@ class ActiveDataArray(DataArray):
     ):
         
         return self._active_op(
-            dataarray_active_max,
+            dataarray_active_max,#duck_array_ops.max,
             *args,
             **kwargs,
         )
@@ -126,6 +127,7 @@ class ActiveDataset(Dataset):
         # Convert variable to DaskActiveArray if not already defined as that type.
         # CFAPyX - FragmentArrayWrapper returns a DaskActiveArray upon indexing.
         variable = darr.variable
+        # If the active parts have been lost at this point.
         if not isinstance(variable.data, DaskActiveArray) and is_active_variable:
             variable.data = DaskActiveArray(
                 variable.data.dask, 
