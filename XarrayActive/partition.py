@@ -486,3 +486,56 @@ def _identical_extents(old, new, dshape):
     return (ostart == nstart) and \
            (ostop == nstop) and \
            (ostep == nstep)
+
+def _get_chunk_space(chunk_shape, shape):
+    """
+    Derive the chunk space and shape given the user-provided ``chunks`` option. 
+    Chunk space is the number of chunks in each dimension which presents like an array 
+    shape, but is referred to as a ``space`` because it has a novel coordinate system. 
+    Chunk shape is the shape of each chunk in ``array space``, which must be regular
+    even if lower-level objects used to define the chunk are not.
+
+    Example: 
+        50 chunks across the time dimension of 1000 values which is represented by 8 
+        fragments. Chunk space representation is (50,) and the chunk shape is (20,). 
+        
+        Each chunk is served by at most 2 fragments, where each chunk is described using a 
+        MultiFragmentWrapper object which appropriately sets the extents of each Fragment 
+        object. The Fragments cover 125 values each:
+    
+        Chunk 0 served by Fragment 0 slice(0,20) 
+        Chunk 1 served by Fragment 0 slice(20,40)
+        ...
+        Chunk 6 served by Fragment 0 slice(120,None) and Fragment 1 slice(0,15)
+        ...
+        and so on.
+
+    """
+
+    q = tuple([int(i/j) for i, j in zip(shape, chunk_shape)])
+    return q
+
+def _get_chunk_shape(chunks, shape, dims, chunk_limits=True):
+    chunk_shape = [i for i in shape]
+
+    for dim in chunks.keys():
+
+        idim = None
+        for x, d in enumerate(dims):
+            if d == dim:
+                idim = x
+
+        if idim == None:
+            raise ValueError(
+                f"Requested chunking across dimension '{dim}'"
+                f"but only '{dims}' present in the dataset"
+            )
+        
+        min_size = int(shape[idim]/np.prod(shape))
+        if chunk_limits:
+            min_size = int(min_size * 2e6)
+        
+        chunk_size = chunks[dim]
+        chunk_shape[idim] = max(chunk_size, min_size)
+
+    return tuple(chunk_shape)

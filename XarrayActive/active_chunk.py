@@ -32,8 +32,6 @@ class ActiveOptionsContainer:
         self._active_chunks = chunks
         self._chunk_limits = chunk_limits
 
-
-
 # Holds all Active routines.
 class ActiveChunk:
 
@@ -43,23 +41,26 @@ class ActiveChunk:
         # Perform any post-processing steps on the data here
         return data
 
-    def _standard_mean(self, axes=None, skipna=None, **kwargs):
+    def _standard_sum(self, axes=None, skipna=None, **kwargs):
         """
         Standard Mean routine matches the normal routine for dask, required at this
         stage if Active mean not available.
         """
-        size = 1
-        for i in axes:
-            size *= self.shape[i]
 
         arr = np.array(self)
         if skipna:
-            total = np.nanmean(arr, axis=axes, **kwargs) *size
+            total = np.nansum(arr, axis=axes, **kwargs)
         else:
-            total = np.mean(arr, axis=axes, **kwargs) *size
-        return {'n': self._numel(axes=axes), 'total': total}
+            total = np.sum(arr, axis=axes, **kwargs)
+        return total
     
-    def _numel(self, axes=None):
+    def _standard_max(self, axes=None, skipna=None, **kwargs):
+        return np.max(self, axis=axes)
+    
+    def _standard_min(self, axes=None, skipna=None, **kwargs):
+        return np.min(self, axis=axes)
+
+    def _numel(self, method, axes=None):
         if not axes:
             return self.size
         
@@ -72,7 +73,7 @@ class ActiveChunk:
 
         return np.full(newshape, size)
 
-    def active_mean(self, axis=None, skipna=None, **kwargs):
+    def active_method(self, method, axis=None, skipna=None, **kwargs):
         """
         Use PyActiveStorage package functionality to perform mean of this Fragment.
 
@@ -83,47 +84,66 @@ class ActiveChunk:
         :returns:       A ``duck array`` (numpy-like) with the reduced array or scalar value, 
                         as specified by the axes parameter.
         """
+
+        standard_methods = {
+            'mean': self._standard_sum,
+            'sum' : self._standard_sum,
+            'max' : self._standard_max,
+            'min' : self._standard_min
+        }
+        ret = None
+        n = self._numel(method, axes=axis)
+
         try:
             from activestorage.active import Active
         except ImportError:
             # Unable to import Active package. Default to using normal mean.
             print("ActiveWarning: Unable to import active module - defaulting to standard method.")
-            return self._standard_mean(axes=axis, skipna=skipna, **kwargs)
+            ret = {
+                'n': n,
+                'total': standard_methods[method](axes=axis, skipna=skipna, **kwargs)
+            }
+
+        if not ret:
             
-        active = Active(self.filename, self.address)
-        active.method = "mean"
-        extent = tuple(self.get_extent())
-        data   = active[extent]
+            active = Active(self.filename, self.address)
+            active.method = method
+            extent = tuple(self.get_extent())
 
-        if axis == None:
-            axis = tuple([i for i in range(self.ndim)])
+            if axis == None:
+                axis = tuple([i for i in range(self.ndim)])
 
-        n = self._numel(axes=axis)
+            n = self._numel(method, axes=axis)
 
-        if len(axis) == self.ndim:
+            if len(axis) == self.ndim:
+                data   = active[extent]
+                t = self._post_process_data(data) * n
 
-            t = self._post_process_data(data) * n
+                ret = {
+                    'n': n,
+                    'total': t
+                }
 
-            r = {
+        if not ret:
+            # Experimental Recursive requesting to get each 1D column along the axes being requested.
+            range_recursives = []
+            for dim in range(self.ndim):
+                if dim not in axis:
+                    range_recursives.append(range(extent[dim].start, extent[dim].stop))
+                else:
+                    range_recursives.append(extent[dim])
+            results = np.array(self._get_elements(active, range_recursives, hyperslab=[]))
+
+            t = self._post_process_data(results) * n
+            ret = {
                 'n': n,
                 'total': t
             }
-            return r
 
-        # Experimental Recursive requesting to get each 1D column along the axes being requested.
-        range_recursives = []
-        for dim in range(self.ndim):
-            if dim not in axis:
-                range_recursives.append(range(extent[dim].start, extent[dim].stop))
-            else:
-                range_recursives.append(extent[dim])
-        results = np.array(self._get_elements(active, range_recursives, hyperslab=[]))
-
-        t = self._post_process_data(results) * n
-        return {
-            'n': n,
-            'total': t
-        }
+        if method == 'mean':
+            return ret
+        else:
+            return ret['total']/ret['n']
 
     def _get_elements(self, active, recursives, hyperslab=[]):
         dimarray = []
@@ -144,26 +164,3 @@ class ActiveChunk:
                 dimarray.append(self._get_elements(active, recursives[1:], hyperslab=newslab))
 
         return dimarray
-
-def _determine_chunk_space(chunks, shape, dims, chunk_limits=True):
-    
-    if not chunks:
-        return None
-
-    chunk_space = [1 for i in range(len(shape))]
-
-    max_chunks = np.prod(shape)
-    if chunk_limits:
-        max_chunks = int(max_chunks/ 2e6)
-
-    for x, d in enumerate(dims):
-        if d not in chunks:
-            continue
-
-        chunks_in_dim = chunks[d]
-        if chunks_in_dim > max_chunks:
-            chunks_in_dim = max_chunks
-
-        chunk_space[x] = int(shape[x]/chunks[d])
-
-    return tuple(chunk_space)

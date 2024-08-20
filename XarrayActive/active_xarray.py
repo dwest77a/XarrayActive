@@ -15,19 +15,68 @@ class ActiveDataArray(DataArray):
 
     def mean(
         self,
-        *,
+        *args,
+        **kwargs,
+    ):
+        
+        return self._active_op(
+            dataarray_active_mean,
+            *args,
+            **kwargs,
+        )
+    
+    def max(
+        self,
+        *args,
+        **kwargs,
+    ):
+        
+        return self._active_op(
+            dataarray_active_max,
+            *args,
+            **kwargs,
+        )
+    
+    def min(
+        self,
+        *args,
+        **kwargs,
+    ):
+        
+        return self._active_op(
+            dataarray_active_min,
+            *args,
+            **kwargs,
+        )
+    
+    def sum(
+        self,
+        *args,
+        **kwargs,
+    ):
+        
+        return self._active_op(
+            dataarray_active_sum,
+            *args,
+            **kwargs,
+        )
+    
+    def _active_op(
+        self,
+        op = None,
         dim = None,
-        skipna = None,
-        keep_attrs = None,
+        *,
+        skipna: bool | None = None,
+        keep_attrs: bool | None = None,
         **kwargs,
     ):
         """
-        Reduce this DataArray's data by applying ``mean`` along some dimension(s).
+        Reduce this DataArray's data by applying an operation along some dimension(s).
 
         Parameters
         ----------
         dim : str, Iterable of Hashable, "..." or None, default: None
-            Name of dimension[s] along which to apply ``mean``. For e.g. ``dim="x"``
+            Name of dimension[s] along which to apply the operation`. For e.g. ``dim="x"``
             or ``dim=["x", "y"]``. If "..." or None, will reduce over all dimensions.
         skipna : bool or None, optional
             If True, skip missing values (as marked by NaN). By default, only
@@ -40,24 +89,28 @@ class ActiveDataArray(DataArray):
             returned without attributes.
         **kwargs : Any
             Additional keyword arguments passed on to the appropriate array
-            function for calculating ``mean`` on this object's data.
+            function for calculating the operation on this object's data.
             These could include dask-specific kwargs like ``split_every``.
 
         Returns
         -------
         reduced : DataArray
-            New DataArray with ``mean`` applied to its data and the
+            New DataArray with ``max`` applied to its data and the
             indicated dimension(s) removed
 
+        See Also
+        --------
+        numpy.max
+        dask.array.max
         """
         return self.reduce(
-            dataarray_active_mean, # from duck_array_ops.mean
+            op,
             dim=dim,
             skipna=skipna,
             keep_attrs=keep_attrs,
             **kwargs,
         )
-    
+        
 class ActiveDataset(Dataset):
 
     # No additional properties
@@ -67,7 +120,6 @@ class ActiveDataset(Dataset):
         """Construct a DataArray by indexing this dataset"""
 
         darr = super()._construct_dataarray(name)
-
 
         is_active_variable = True
 
@@ -96,7 +148,19 @@ class ActiveDataset(Dataset):
             fastpath=True
         )
     
-def dataarray_active_mean(array: DaskActiveArray, axis=None, skipna=None, **kwargs):
+def dataarray_active_mean(array, *args, **kwargs):
+    return dataarray_active_method(array, 'mean', *args, **kwargs)
+
+def dataarray_active_max(array, *args, **kwargs):
+    return dataarray_active_method(array, 'max', *args, **kwargs)
+
+def dataarray_active_min(array, *args, **kwargs):
+    return dataarray_active_method(array, 'min', *args, **kwargs)
+
+def dataarray_active_sum(array, *args, **kwargs):
+    return dataarray_active_method(array, 'sum', *args, **kwargs)
+
+def dataarray_active_method(array: DaskActiveArray, method: str, axis=None, skipna=None, **kwargs):
     """
     Function provided to dask reduction, activates the ``active_mean`` method of the ``DaskActiveArray``.
 
@@ -110,9 +174,24 @@ def dataarray_active_mean(array: DaskActiveArray, axis=None, skipna=None, **kwar
                     ``DaskActiveArray`` object.
     """
     from xarray.core import duck_array_ops
+    arr_methods = {
+        'mean': array.active_mean,
+        'max': array.active_max,
+        'min': array.active_min,
+        'sum': array.active_sum
+    }
+
+    duck_methods = {
+        'mean': duck_array_ops.mean,
+        'max': duck_array_ops.max,
+        'min': duck_array_ops.min,
+        'sum': duck_array_ops.sum
+    }
+
+    from xarray.core import duck_array_ops
     try:
-        return array.active_mean(axis, skipna=skipna, **kwargs)
+        return arr_methods[method](axis, skipna=skipna, **kwargs)
     except AttributeError:
         print("ActiveWarning: Unable to compute active mean - array has already been loaded.")
         print("NetCDF file size may prohibit lazy loading and thus Active methods.")
-        return duck_array_ops.mean(array, axis=axis, skipna=skipna, **kwargs)
+        return duck_methods[method](array, axis=axis, skipna=skipna, **kwargs)
