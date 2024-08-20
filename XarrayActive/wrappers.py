@@ -1,8 +1,12 @@
-from .partition import (
+from arraypartition import (
     ArrayPartition, 
     ArrayLike,
-    _get_chunk_space,
-    _get_chunk_shape,
+    get_chunk_space,
+    get_chunk_shape,
+    get_chunk_positions,
+    get_chunk_extent,
+    get_dask_chunks,
+    combine_slices
 )
 from .active_chunk import (
     ActiveChunk, 
@@ -25,7 +29,7 @@ class ActivePartition(ArrayPartition):
 
         kwargs = self.get_kwargs()
         if extent:
-            kwargs['extent'] = self._combine_slices(extent)
+            kwargs['extent'] = combine_slices(self.shape, list(self.get_extent()), extent)
         ap = ActivePartition(
             self.filename,
             self.address,
@@ -60,14 +64,14 @@ class ActiveArrayWrapper(ArrayLike, ActiveOptionsContainer):
 
         super().__init__(shape, units=units, dtype=dtype)
 
-        self.chunk_shape = _get_chunk_shape(
+        self.chunk_shape = get_chunk_shape(
             self._active_chunks,
             self.shape,
             self.named_dims,
             chunk_limits=self._chunk_limits
         )
 
-        self.chunk_space = _get_chunk_space(
+        self.chunk_space = get_chunk_space(
             self.chunk_shape,
             self.shape
         )
@@ -96,14 +100,17 @@ class ActiveArrayWrapper(ArrayLike, ActiveOptionsContainer):
 
             array_name = (f"{self.__class__.__name__}-{tokenize(self)}",)
             dsk = {}
-            positions = self.get_chunk_positions()
-            request   = self.get_chunk_extent(positions[0])
+            positions = get_chunk_positions(self.chunk_space)
+            request   = get_chunk_extent(positions[0], self.shape, self.chunk_space)
+
+            global_extent = {}
 
             for position in positions:
                 position = tuple(position)
             
-                extent   = self.get_chunk_extent(position)
+                extent   = get_chunk_extent(position, self.shape, self.chunk_space)
                 cformat  = None
+                global_extent[position] = extent
                 
                 chunk = ActivePartition(
                     self.filename,
@@ -126,92 +133,12 @@ class ActiveArrayWrapper(ArrayLike, ActiveOptionsContainer):
                     getattr(chunk,"_lock",False)
                 )
 
-            return DaskActiveArray(dsk, array_name[0], chunks=self.get_dask_chunks(), dtype=self.dtype)
-
-    def get_chunk_positions(self):
-        origin = [0 for i in range(self.ndim)]
-
-        positions = [
-            coord for coord in product(
-                *[range(r[0], r[1]) for r in zip(origin, self.chunk_space)]
+            dask_chunks = get_dask_chunks(
+                self.shape,
+                self.chunk_space,
+                extent=global_extent,
+                dtype=self.dtype,
+                explicit_shapes=None
             )
-        ]
 
-        return positions
-    
-    def get_chunk_extent(self, position):
-        extent = []
-        for dim in range(self.ndim):
-            pos_index   = position[dim]
-            shape_size = self.shape[dim]
-            space_size = self.chunk_space[dim]
-
-            conversion = shape_size/space_size
-
-            ext = slice(
-                int(pos_index*conversion), int((pos_index+1)*conversion)
-            )
-            extent.append(ext)
-        return extent
-
-    def get_dask_chunks(self, explicit_shapes=None):
-        """
-        Define the `chunks` array passed to Dask when creating a Dask Array. This is an array of fragment sizes 
-        per dimension for each of the relevant dimensions. Copied from cf-python version 3.14.0 onwards.
-
-        Explicit shapes copied from cf-python but not implemented in the wider class.
-
-        :returns:       A tuple of the chunk sizes along each dimension.
-        """
-                
-        from numbers import Number
-        from dask.array.core import normalize_chunks
-
-        ndim   = len(self.shape)
-        csizes_per_dim, chunked_dim_indices = [],[]
-
-        for dim, n_chunks in enumerate(self.chunk_space):
-            if n_chunks != 1:
-
-                csizes = []
-                index = [0] * ndim
-                for n in range(n_chunks):
-                    index[dim] = n
-                    ext = self.get_chunk_extent(index)[dim]
-                    chunk_size = ext.stop - ext.start
-                    csizes.append(chunk_size)
-
-                csizes_per_dim.append(tuple(csizes))
-                chunked_dim_indices.append(dim)
-            else:
-                # This aggregated dimension is spanned by exactly one
-                # fragment. Store None, for now, in the expectation
-                # that it will get overwritten.
-                csizes_per_dim.append(None)
-
-        ## Handle explicit shapes for the fragments.
-
-        if isinstance(explicit_shapes, (str, Number)) or explicit_shapes is None:
-            csizes_per_dim = [
-                cs if i in chunked_dim_indices else explicit_shapes for i, cs in enumerate(csizes_per_dim)
-            ]
-        elif isinstance(explicit_shapes, dict):
-            csizes_per_dim = [
-                csizes_per_dim[i] if i in chunked_dim_indices else explicit_shapes.get(i, "auto")
-                for i, cs in enumerate(csizes_per_dim)
-            ]
-        else:
-            # explicit_shapes is a sequence
-            if len(explicit_shapes) != ndim:
-                raise ValueError(
-                    f"Wrong number of 'explicit_shapes' elements in {explicit_shapes}: "
-                    f"Got {len(explicit_shapes)}, expected {ndim}"
-                )
-
-            csizes_per_dim = [
-                cs if i in chunked_dim_indices else explicit_shapes[i] for i, cs in enumerate(csizes_per_dim)
-            ]
-
-        c = normalize_chunks(csizes_per_dim, shape=self.shape, dtype=self.dtype)
-        return c
-
+            return DaskActiveArray(dsk, array_name[0], chunks=dask_chunks, dtype=self.dtype)
