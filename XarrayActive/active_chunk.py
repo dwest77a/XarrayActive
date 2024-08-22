@@ -23,7 +23,8 @@ class ActiveOptionsContainer:
 
     def _set_active_options(self, chunks={}, chunk_limits=True):
 
-        if chunks == {}:
+
+        if chunks == {} and False: # Remove for testing
             raise NotImplementedError(
                 'Default chunking is not implemented, please provide a chunk scheme '
                 ' - active_options = {"chunks": {}}'
@@ -106,13 +107,18 @@ class ActiveChunk:
 
         if not ret:
             
+            # Create Active client
             active = Active(self.filename, self.address)
             active.method = method
+
+            # Fetch extent for this chunk instance.
             extent = tuple(self.get_extent())
 
+            # Properly format the 'axis' kwarg.
             if axis == None:
                 axis = tuple([i for i in range(self.ndim)])
 
+            # Determine reduction parameter for combining chunk results for dask.
             n = self._numel(method, axes=axis)
 
             if len(axis) == self.ndim:

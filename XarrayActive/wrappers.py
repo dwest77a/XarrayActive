@@ -6,7 +6,8 @@ from arraypartition import (
     get_chunk_positions,
     get_chunk_extent,
     get_dask_chunks,
-    combine_slices
+    combine_slices,
+    normalize_partition_chunks
 )
 from .active_chunk import (
     ActiveChunk, 
@@ -63,6 +64,12 @@ class ActiveArrayWrapper(ArrayLike, ActiveOptionsContainer):
         self.named_dims = named_dims
 
         super().__init__(shape, units=units, dtype=dtype)
+
+        self._active_chunks = normalize_partition_chunks(
+            self._active_chunks,
+            self.shape,
+            self.dtype,
+            self.named_dims)
 
         self.chunk_shape = get_chunk_shape(
             self._active_chunks,

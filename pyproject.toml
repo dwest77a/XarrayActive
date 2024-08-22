@@ -16,4 +16,4 @@ authors = [{name = "Daniel Westwood", email = "daniel.westwood@stfc.ac.uk"}]
 packages = ["XarrayActive"]
 
 [project.entry-points."xarray.backends"]
-Active = "XarrayActive:ActiveBackendEntrypoint"
+Active = "XarrayActive.backend:ActiveBackendEntrypoint"
