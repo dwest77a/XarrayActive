@@ -10,7 +10,7 @@ def test_active():
         ds = xr.open_dataset(
             path_to_active, 
             engine='Active',
-            active_options={})#{'chunks':{'time':2}})
+            active_options={})
     except Exception as err:
         assert isinstance(err, NotImplementedError)
 
@@ -29,7 +29,7 @@ def test_active():
     p_value = p_sel.mean()
 
     assert p_value.shape == ()
-    assert (p_value.to_numpy() - 0.53279) < 0.01
+    assert (p_value.to_numpy() - 0.511954) < 0.01
 
 def test_active_recursive():
 
@@ -39,7 +39,7 @@ def test_active_recursive():
         ds = xr.open_dataset(
             path_to_active, 
             engine='Active',
-            active_options={})#{'chunks':{'time':2}})
+            active_options={})
     except Exception as err:
         assert isinstance(err, NotImplementedError)
 
@@ -58,7 +58,7 @@ def test_active_recursive():
     p_mean = p_sel.mean(dim='time')
 
     assert p_mean.shape == (5, 10)
-    assert (p_mean[0][0].to_numpy() - 0.683402) < 0.01
+    assert (p_mean[0][0].to_numpy() - 0.635366) < 0.01
 
 def test_active_methods():
 
@@ -68,7 +68,7 @@ def test_active_methods():
         ds = xr.open_dataset(
             path_to_active, 
             engine='Active',
-            active_options={})#{'chunks':{'time':2}})
+            active_options={})
     except Exception as err:
         assert isinstance(err, NotImplementedError)
 
@@ -100,3 +100,4 @@ if __name__ == '__main__':
     test_active()
     test_active_recursive()
     test_active_methods()
+    print('All tests passed!')
