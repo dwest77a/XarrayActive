@@ -65,11 +65,12 @@ class ActiveArrayWrapper(ArrayLike, ActiveOptionsContainer):
 
         super().__init__(shape, units=units, dtype=dtype)
 
-        self._active_chunks = normalize_partition_chunks(
-            self._active_chunks,
-            self.shape,
-            self.dtype,
-            self.named_dims)
+        # Further work required to get this to work - 23/08/24
+        #self._active_chunks = normalize_partition_chunks(
+        #    self._active_chunks,
+        #    self.shape,
+        #    self.dtype,
+        #    self.named_dims)
 
         self.chunk_shape = get_chunk_shape(
             self._active_chunks,
