@@ -5,15 +5,19 @@ build-backend = "setuptools.build_meta"
 [project]
 requires-python=">=3.7"
 name="XarrayActive"
-version="2024.8.2"
+version="2024.9.0"
 dynamic = ["dependencies"]
 authors = [{name = "Daniel Westwood", email = "daniel.westwood@stfc.ac.uk"}]
+readme="README.md"
+description="Xarray Backend Engine to enable the PyActiveStorage Python Package"
+license = {file = "LICENSE"}
+keywords = ["active","xarray","XarrayActive","ArrayPartition"]
 
-#[tool.setuptools.dynamic]
-#dependencies = {file = ["requirements_dev.txt"]}
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
 
 [tool.setuptools]
 packages = ["XarrayActive"]
 
 [project.entry-points."xarray.backends"]
-Active = "XarrayActive:ActiveBackendEntrypoint"
+Active = "XarrayActive.backend:ActiveBackendEntrypoint"

@@ -19,18 +19,28 @@ class ActiveDataStore(NetCDF4DataStore, ActiveOptionsContainer):
 
     def get_variables(self):
         """
+        Override normal store behaviour to allow opening some variables 'actively'
         """
         return FrozenDict(
             (k, self.open_variable(k, v)) for k, v in self.ds.variables.items()
         )
     
     def open_variable(self, name: str, var):
+        """
+        Allow opening some variables 'actively', if they are not a dimension (where
+        you'll want the whole array anyway) and where the active chunks are specified
+        - required by XarrayActive.
+        """
         if name in self.ds.dimensions or not self._active_chunks:
             return self.open_store_variable(name, var)
         else:
             return self.open_active_variable(name, var)
 
     def open_active_variable(self, name: str, var):
+        """
+        Utilise the ActiveArrayWrapper builder to obtain the data
+        Lazily for this variable so active methods can be applied later.
+        """
         import netCDF4
 
         dimensions = var.dimensions
@@ -52,6 +62,7 @@ class ActiveDataStore(NetCDF4DataStore, ActiveOptionsContainer):
             )
         )
         
+        # Everything after this point is normal store behaviour
         encoding   = {}
 
         if isinstance(var.datatype, netCDF4.EnumType):

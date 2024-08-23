@@ -14,53 +14,18 @@ class ActiveDataArray(DataArray):
     # No additional properties
     __slots__ = ()
 
-    def mean(
-        self,
-        *args,
-        **kwargs,
-    ):
-        
-        return self._active_op(
-            dataarray_active_mean,
-            *args,
-            **kwargs,
-        )
+    # Override Xarray DataArray standard functions in favour of Active enabled ones.
+    def mean(self, *args,**kwargs):
+        return self._active_op(dataarray_active_mean, *args, **kwargs)
     
-    def max(
-        self,
-        *args,
-        **kwargs,
-    ):
-        
-        return self._active_op(
-            dataarray_active_max,#duck_array_ops.max,
-            *args,
-            **kwargs,
-        )
+    def max(self, *args,**kwargs):
+        return self._active_op(dataarray_active_max, *args, **kwargs)
     
-    def min(
-        self,
-        *args,
-        **kwargs,
-    ):
-        
-        return self._active_op(
-            dataarray_active_min,
-            *args,
-            **kwargs,
-        )
+    def min(self, *args,**kwargs):
+        return self._active_op(dataarray_active_min, *args, **kwargs)
     
-    def sum(
-        self,
-        *args,
-        **kwargs,
-    ):
-        
-        return self._active_op(
-            dataarray_active_sum,
-            *args,
-            **kwargs,
-        )
+    def sum(self, *args,**kwargs):
+        return self._active_op(dataarray_active_sum, *args, **kwargs)
     
     def _active_op(
         self,
@@ -72,7 +37,7 @@ class ActiveDataArray(DataArray):
         **kwargs,
     ):
         """
-        Reduce this DataArray's data by applying an operation along some dimension(s).
+        Reduce this DataArray's data by applying an ``active`` operation along some dimension(s).
 
         Parameters
         ----------
@@ -96,21 +61,16 @@ class ActiveDataArray(DataArray):
         Returns
         -------
         reduced : DataArray
-            New DataArray with ``max`` applied to its data and the
+            New DataArray with reduction applied to its data and the
             indicated dimension(s) removed
 
-        See Also
-        --------
-        numpy.max
-        dask.array.max
         """
         return self.reduce(
             op,
             dim=dim,
             skipna=skipna,
             keep_attrs=keep_attrs,
-            **kwargs,
-        )
+            **kwargs)
         
 class ActiveDataset(Dataset):
 
@@ -150,6 +110,7 @@ class ActiveDataset(Dataset):
             fastpath=True
         )
     
+## DataArray methods to apply to the DaskActiveArray
 def dataarray_active_mean(array, *args, **kwargs):
     return dataarray_active_method(array, 'mean', *args, **kwargs)
 
@@ -164,7 +125,7 @@ def dataarray_active_sum(array, *args, **kwargs):
 
 def dataarray_active_method(array: DaskActiveArray, method: str, axis=None, skipna=None, **kwargs):
     """
-    Function provided to dask reduction, activates the ``active_mean`` method of the ``DaskActiveArray``.
+    Function provided to dask reduction, activates the ``active`` methods of the ``DaskActiveArray``.
 
     :param array:       (obj) A DaskActiveArray object which has additional methods enabling Active operations.
 
@@ -183,6 +144,7 @@ def dataarray_active_method(array: DaskActiveArray, method: str, axis=None, skip
         'sum': array.active_sum
     }
 
+    # On failure of the Active method, can use Duck methods instead - normal behaviour.
     duck_methods = {
         'mean': duck_array_ops.mean,
         'max': duck_array_ops.max,
