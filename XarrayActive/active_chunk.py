@@ -23,10 +23,16 @@ class ActiveOptionsContainer:
 
     def _set_active_options(self, chunks={}, chunk_limits=True):
 
-
-        if chunks == {} and False: # Remove for testing
+        # Auto chunking is not currently supported - 23/08/24
+        if chunks == {}:
             raise NotImplementedError(
                 'Default chunking is not implemented, please provide a chunk scheme '
+                ' - active_options = {"chunks": {}}'
+            )
+        
+        if 'auto' in chunks.items():
+            raise NotImplementedError(
+                'Auto chunking is not implemented, please provide a chunk scheme '
                 ' - active_options = {"chunks": {}}'
             )
 
