@@ -33,7 +33,7 @@ class ActiveDataArray(DataArray):
     ):
         
         return self._active_op(
-            dataarray_active_max,#duck_array_ops.max,
+            dataarray_active_max,
             *args,
             **kwargs,
         )
