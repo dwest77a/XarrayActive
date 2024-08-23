@@ -101,3 +101,16 @@ class ActiveDataStore(NetCDF4DataStore, ActiveOptionsContainer):
         encoding["original_shape"] = data.shape
 
         return Variable(dimensions, data, attributes, encoding)
+
+    def _acquire(self, needs_lock=True):
+        """
+        Fetch the global or group dataset from the Datastore Caching Manager.
+        This manager needs to be overriden for S3 Active methods
+        """
+        super()._acquire(needs_lock=needs_lock)
+        #with self._manager.acquire_context(needs_lock) as root:
+            #ds = open(root, self._group, self._mode)
+
+        #self.conventions = ds.Conventions
+
+        #return ds
