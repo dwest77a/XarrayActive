@@ -13,7 +13,7 @@ pip install -e .
 ```
 import xarray as xr
 
-ds = xr.open_dataset('cfa_file.nc', engine='Active')
+ds = xr.open_dataset('any_file.nc', engine='Active')
 # Plot data
 
 ```
