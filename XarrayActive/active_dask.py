@@ -4,6 +4,8 @@ from dask.utils import deepmap
 from dask.array.core import _concatenate2
 import numpy as np
 
+from .active_chunk import ActiveChunk
+
 def partition_mean(arr, *args, **kwargs):
     return partition_method(arr, 'mean', *args, **kwargs)
     
@@ -18,12 +20,13 @@ def partition_sum(arr, *args, **kwargs):
     
 def partition_method(arr, method, *args, **kwargs):
     if hasattr(arr,'active_method'):
+        # Active method for each array partition
         return arr.active_method(method,*args, **kwargs)
+    elif arr.size != 0:
+        print('ActiveWarning: Using standard mean given non-active array partition')
+        return arr.mean(*args, **kwargs)
     else:
-        # Additional handling for 'meta' calculations in dask.
-        # Not currently implemented, bypassed using None
-        if arr.size == 0:
-            return None
+        # Computing meta - dask operation not fully utilised.
         return None
 
 def general_combine(pairs, axis=None):
@@ -48,12 +51,12 @@ class DaskActiveArray(da.Array):
     def is_active(self):
         return True
 
-    #def copy(self):
-    #    """
-    #    Create a new DaskActiveArray instance with all the same parameters as the current instance.
-    #    """
-     #   copy_arr = DaskActiveArray(self.dask, self.name, self.chunks, meta=self)
-    #    return copy_arr
+    def copy(self):
+        """
+        Create a new DaskActiveArray instance with all the same parameters as the current instance.
+        """
+        copy_arr = DaskActiveArray(self.dask, self.name, self.chunks, meta=self)
+        return copy_arr
     
     def __getitem__(self, index):
         """
@@ -78,7 +81,6 @@ class DaskActiveArray(da.Array):
         :returns:       A new ``DaskActiveArray`` object which has been reduced along the specified axes using
                         the concatenations of active_means from each chunk.
         """
-
         newarr = da.reduction(
             self,
             partition_mean,
@@ -164,3 +166,16 @@ class DaskActiveArray(da.Array):
         )
 
         return newarr
+    
+    def active_method(self, method, axis=None, skipna=None, **kwargs):
+        """
+        Pointer to the active methods of the DaskActiveArray, for use
+        in the nested Dask setup with CFA Dask-AnySize Chunks.
+        """
+        methods = {
+            'mean':self.active_mean,
+            'max':self.active_max,
+            'min':self.active_min,
+            'sum':self.active_sum
+        }
+        return methods[method](axis=axis, skipna=skipna)
