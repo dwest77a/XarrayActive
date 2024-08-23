@@ -13,8 +13,8 @@ description="Xarray Backend Engine to enable the PyActiveStorage Python Package"
 license = {file = "LICENSE"}
 keywords = ["active","xarray","XarrayActive","ArrayPartition"]
 
-#[tool.setuptools.dynamic]
-#dependencies = {file = ["requirements.txt"]}
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
 
 [tool.setuptools]
 packages = ["XarrayActive"]
