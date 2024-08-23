@@ -6,6 +6,8 @@ import numpy as np
 
 from .active_chunk import ActiveChunk
 
+## Partition Methods are the first step in the Dask Reductions.
+
 def partition_mean(arr, *args, **kwargs):
     return partition_method(arr, 'mean', *args, **kwargs)
     
@@ -29,6 +31,10 @@ def partition_method(arr, method, *args, **kwargs):
         # Computing meta - dask operation not fully utilised.
         return None
 
+## Combining results from Partition methods
+# - Dask built-in mean-agg and mean-combine for mean.
+# - Min/Max/Sum require simple functions for combine/aggregation.
+
 def general_combine(pairs, axis=None):
     if not isinstance(pairs, list):
         pairs = [pairs]
@@ -49,6 +55,7 @@ class DaskActiveArray(da.Array):
 
     @property
     def is_active(self):
+        # Quick way of distinguishing from Dask Array
         return True
 
     def copy(self):

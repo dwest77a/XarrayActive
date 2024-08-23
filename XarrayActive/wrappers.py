@@ -6,11 +6,9 @@ from arraypartition import (
     get_chunk_positions,
     get_chunk_extent,
     get_dask_chunks,
-    combine_slices,
-    normalize_partition_chunks
+    combine_slices
 )
 from .active_chunk import (
-    ActiveChunk, 
     ActiveOptionsContainer
 )
 
@@ -23,8 +21,8 @@ from itertools import product
 
 class ActivePartition(ArrayPartition):
     """
-    Combines ActiveChunk - active methods, and ArrayPartition - array methods
-    into a single ChunkWrapper class. 
+    Container for future ActivePartition behaviour, may not be required unless
+    additional behaviour is required.
     """
     def copy(self, extent=None):
 
@@ -66,6 +64,7 @@ class ActiveArrayWrapper(ArrayLike, ActiveOptionsContainer):
         super().__init__(shape, units=units, dtype=dtype)
 
         # Further work required to get this to work - 23/08/24
+
         #self._active_chunks = normalize_partition_chunks(
         #    self._active_chunks,
         #    self.shape,
@@ -102,7 +101,7 @@ class ActiveArrayWrapper(ArrayLike, ActiveOptionsContainer):
             return self._variable
         else:
 
-            # for every dask chunk return a smaller object with the right extent.
+            # For every dask chunk return a smaller object with the right extent.
             # Create a chunk_shape tuple from chunks and _variable (figure out which chunk and which axis, divide etc.)
             # Define a subarray for each chunk, with appropriate index.
 
