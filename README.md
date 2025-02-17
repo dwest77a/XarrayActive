@@ -1,4 +1,7 @@
 # XarrayActive
+
+[![PyPI version](https://badge.fury.io/py/XarrayActive.svg)](https://pypi.python.org/pypi/XarrayActive/)
+
 For use with the Xarray module as an additional backend. See the module[PyActiveStorage](https://github.com/NCAS-CMS/PyActiveStorage) for more details.
 
 ## Installation
